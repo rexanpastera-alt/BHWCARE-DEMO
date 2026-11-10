@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BHWCARE - Electronic Health Record Management Module</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        teal: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        },
+                        medical: {
+                            navy: '#0f172a',
+                            slate: '#f8fafc',
+                            blue: '#0284c7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas & Font Styles -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .pulse-badge { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="text-slate-800 flex h-screen overflow-hidden antialiased">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between shrink-0 shadow-xl z-20">
+        <div>
+            <!-- Logo Header -->
+            <div class="px-6 py-5 flex items-center gap-3 border-b border-slate-800 bg-slate-950">
+                <div class="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-teal-900/50">
+                    <i class="fa-solid font-bold fa-notes-medical"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight tracking-wider">BHWCARE</h1>
+                    <p class="text-[10px] text-teal-400 font-medium leading-none mt-0.5">EHR Module for BHWs</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="px-3 py-4 space-y-1">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-teal-700 text-white">
+                    <i class="fa-solid fa-chart-pie w-5"></i>
+                    <span>Dashboard & Analytics</span>
+                </button>
+                
+                <button onclick="switchTab('patients')" id="nav-patients" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-users-medical w-5"></i>
+                    <span>Patient Health Records</span>
+                </button>
+
+                <button onclick="switchTab('inventory')" id="nav-inventory" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-boxes-packing w-5"></i>
+                    <span>Medicine Inventory (FIFO)</span>
+                    <span id="inventory-alert-badge" class="ml-auto bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold border border-amber-500/30">2 Alerts</span>
+                </button>
+
+                <button onclick="switchTab('nfr')" id="nav-nfr" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-shield-halved w-5"></i>
+                    <span>NFR Compliance Monitor</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- System Version & Lock Indicator -->
+        <div class="p-4 border-t border-slate-800 bg-slate-950/60 text-xs text-slate-400 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-emerald-400"></i> DPA 2012 Compliant</span>
+                <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono">v2.4.0</span>
+            </div>
+            <div class="text-[11px] text-slate-500">Database: PostgreSQL 15 (TLS 1.3)</div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden">
+        
+        <!-- TOP NAVBAR / ROLE SWITCHER -->
+        <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-sm z-10">
+            <!-- Left Header Title -->
+            <div class="flex items-center gap-4">
+                <h2 id="page-title" class="text-xl font-bold text-slate-800">Dashboard & Analytics</h2>
+                <span id="role-badge" class="bg-teal-100 text-teal-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-teal-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-shield"></i> Role: BHW User
+                </span>
+            </div>
+
+            <!-- Right Controls: Role Simulator & Timer -->
+            <div class="flex items-center gap-4">
+                <!-- Inactivity Demo Timer -->
+                <div class="hidden lg:flex items-center gap-2 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200" title="FR-03 Auto Session Termination Safety">
+                    <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
+                    <span>Auto-Logout: <strong id="session-timer" class="font-mono text-slate-800">14:58</strong></span>
+                    <button onclick="resetTimer()" class="text-xs text-teal-600 hover:underline ml-1">Reset</button>
+                </div>
+
+                <!-- Role Switcher Dropdown (Demo Feature) -->
+                <div class="flex items-center gap-2 border-l border-slate-200 pl-4">
+                    <label for="user-role-select" class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Simulate Role:</label>
+                    <select id="user-role-select" onchange="changeRole(this.value)" class="text-xs bg-slate-50 border border-slate-300 font-medium rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        <option value="BHW" selected>BHW (Barangay Health Worker)</option>
+                        <option value="Admin">Administrator (Full Access)</option>
+                        <option value="Official">Barangay Official (View Only)</option>
+                    </select>
+                </div>
+
+                <!-- Profile Avatar -->
+                <div class="flex items-center gap-2 pl-2">
+                    <div class="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-slate-600 text-sm">
+                        <span id="user-avatar-initials">BH</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- DYNAMIC PERMISSION BANNER -->
+        <div id="permission-banner" class="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-800 flex items-center justify-between hidden">
+            <span class="flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+                <span id="permission-banner-text">Viewing mode active: Barangay Official permissions are restricted to read-only analytics and inventory summaries.</span>
+            </span>
+            <button onclick="changeRole('BHW')" class="underline font-semibold text-amber-900 hover:text-amber-950">Switch back to BHW</button>
+        </div>
+
+        <!-- BODY SCROLLABLE CONTAINER -->
+        <main class="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+
+            <!-- ================= MODULE A & D: DASHBOARD & ANALYTICS ================= -->
+            <section id="tab-dashboard" class="space-y-6">
+                <!-- Top Key Metrics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Registered Patients</p>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-1" id="stat-total-patients">1,482</h3>
+                            <p class="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-trend-up"></i> +12 this week
+                            </p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-address-book"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultations Today</p>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-1">28</h3>
+                            <p class="text-xs text-teal-600 font-medium mt-1">8 Pediatric / 20 Adult</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-stethoscope"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Low / Expiring Stock</p>
+                            <h3 class="text-2xl font-bold text-amber-600 mt-1" id="stat-low-stock">3 Batches</h3>
+                            <p class="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
+                                <i class="fa-solid fa-circle-exclamation"></i> Action required (FIFO)
+                            </p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pediatric Coverage</p>
+                            <h3 class="text-2xl font-bold text-slate-800 mt-1">94.2%</h3>
+                            <p class="text-xs text-emerald-600 font-medium mt-1">WHO Vaccine Compliance</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-baby font-bold"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HTML5 Canvas Visualizations Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Morbidity Trend Canvas -->
+                    <div class="lg:col-span-2 bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-800">Monthly Morbidity & Consultation Trends</h3>
+                                <p class="text-xs text-slate-500">Tracked epidemiological cases in Brgy. Poblacion (2026)</p>
+                            </div>
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-medium border border-slate-200">FR-12 Analytics</span>
+                        </div>
+                        <div class="relative h-64 w-full">
+                            <canvas id="morbidityChartCanvas" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Malnutrition & Growth Canvas -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-800">Pediatric Nutrition Status</h3>
+                                <p class="text-xs text-slate-500">WHO Weight-for-Age classification</p>
+                            </div>
+                            <i class="fa-solid fa-chart-pie text-teal-600"></i>
+                        </div>
+                        <div class="relative h-52 flex items-center justify-center">
+                            <canvas id="nutritionPieCanvas" width="220" height="220"></canvas>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs font-medium pt-2 border-t border-slate-100">
+                            <div class="p-1 rounded bg-emerald-50 text-emerald-700">Normal (85%)</div>
+                            <div class="p-1 rounded bg-amber-50 text-amber-700">Underweight (11%)</div>
+                            <div class="p-1 rounded bg-rose-50 text-rose-700">Severe (4%)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Report Exporting & Action Hub (FR-13, FR-14) -->
+                <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <h4 class="font-bold text-slate-800 text-base">City/Municipal Health Office (CHO/MHO) Reporting Hub</h4>
+                        <p class="text-xs text-slate-500">Generate standardized monthly morbidity digests, pediatric vaccination logs, and inventory balances.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="openReportModal('PDF')" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm">
+                            <i class="fa-solid fa-file-pdf text-rose-400"></i> Export Formal PDF
+                        </button>
+                        <button onclick="openReportModal('CSV')" class="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm">
+                            <i class="fa-solid fa-file-csv text-teal-300"></i> Export Data CSV
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ================= MODULE B: ELECTRONIC HEALTH RECORDS (EHR) ================= -->
+            <section id="tab-patients" class="space-y-6 hidden">
+                
+                <!-- Action Header Bar -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <!-- Search Input -->
+                    <div class="relative flex-1 max-w-md">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="patient-search" onkeyup="filterPatients()" placeholder="Search patient by name, Household ID, or Patient ID..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+
+                    <!-- Filter Dropdown & Register Button -->
+                    <div class="flex items-center gap-3">
+                        <select id="patient-filter-condition" onchange="filterPatients()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            <option value="ALL">All Health Statuses</option>
+                            <option value="Hypertension">Hypertension Tracked</option>
+                            <option value="Diabetes">Diabetes Type II</option>
+                            <option value="Pediatric">Pediatric (0-5 yrs)</option>
+                        </select>
+
+                        <button id="btn-register-patient" onclick="openRegisterPatientModal()" class="btn-restricted px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors shadow">
+                            <i class="fa-solid fa-user-plus"></i> Register New Patient
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Patient Master Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Patient ID / QR</th>
+                                    <th class="py-3.5 px-4">Full Name</th>
+                                    <th class="py-3.5 px-4">Age / Sex</th>
+                                    <th class="py-3.5 px-4">Household ID</th>
+                                    <th class="py-3.5 px-4">Chronic Illness Track</th>
+                                    <th class="py-3.5 px-4">Last Visit</th>
+                                    <th class="py-3.5 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patient-table-body" class="divide-y divide-slate-200 text-sm">
+                                <!-- Dynamic Patient Rows populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ================= MODULE C: MEDICINE INVENTORY (FIFO) ================= -->
+            <section id="tab-inventory" class="space-y-6 hidden">
+                
+                <!-- Top Status Header & Dispense Action -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg">Barangay Pharmacy & Supply Inventory</h3>
+                        <p class="text-xs text-slate-500">First-In, First-Out (FIFO) batch control with expiry monitoring (FR-08, FR-09).</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button id="btn-dispense-med" onclick="openDispenseModal()" class="btn-restricted px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors shadow">
+                            <i class="fa-solid fa-prescription-bottle-medical"></i> Dispense Medication (UC-02)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Inventory Batch Stock Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/70 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Item Name & Category</th>
+                                    <th class="py-3.5 px-4">Batch #</th>
+                                    <th class="py-3.5 px-4">Expiry Date</th>
+                                    <th class="py-3.5 px-4">FIFO Status</th>
+                                    <th class="py-3.5 px-4">Stock Level</th>
+                                    <th class="py-3.5 px-4">Alert Level</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-slate-200 text-sm">
+                                <!-- Dynamic Inventory Rows populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Dispensing Audit Logs (FR-10) -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-teal-600"></i> Dispensing Audit Trail (Real-Time Log)
+                    </h4>
+                    <div class="divide-y divide-slate-100 text-xs custom-scrollbar max-h-48 overflow-y-auto" id="dispense-audit-logs">
+                        <!-- Audit Log Items appended here dynamically -->
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ================= SECTION NFR: NON-FUNCTIONAL REQUIREMENTS INSPECTOR ================= -->
+            <section id="tab-nfr" class="space-y-6 hidden">
+                <div class="bg-slate-900 text-white p-6 rounded-xl shadow-md border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="bg-teal-500/20 text-teal-300 text-xs font-mono px-3 py-1 rounded-full border border-teal-500/30">System SRS Inspection Mode</span>
+                        <span class="text-xs text-slate-400">Target Standard: Chapter 3 Thesis Validation</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white">Non-Functional Requirements & Security Metrics</h3>
+                    <p class="text-slate-400 text-xs leading-relaxed max-w-3xl">Live architectural validation of parameters including Data Privacy Act 2012 compliance (RA 10173), cryptographic password protection standards, database query latency benchmarks, and disaster backup schedules.</p>
+                </div>
+
+                <!-- NFR Audit Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- NFR-01 Security & Data Privacy -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-shield-halved text-emerald-600"></i> NFR-01: Security & Data Privacy
+                            </h4>
+                            <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">PASSED</span>
+                        </div>
+                        
+                        <div class="space-y-3 text-xs">
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                                <div class="font-semibold text-slate-700">DPA 2012 Compliance (Republic Act No. 10173)</div>
+                                <div class="text-slate-500">Patient consent logged per registration. Sensitive fields (PII) AES-256 encrypted at rest.</div>
+                            </div>
+                            
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                                <div class="font-semibold text-slate-700">Transport Layer Security</div>
+                                <div class="text-slate-500 flex items-center gap-2">
+                                    <span>Protocol: HTTPS / TLS 1.3 Cipher Suite</span>
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1 font-mono">
+                                <div class="font-sans font-semibold text-slate-700">Password Hashing Inspection</div>
+                                <div class="text-slate-600 text-[11px] truncate">bcrypt_hash($password, salt_rounds=10)</div>
+                                <div class="text-teal-700 text-[10px] truncate">$2b$10$e8Z90zY6jT9dYnQzWk.4uePZtK7N...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NFR-02 & NFR-03 Performance & Availability -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-gauge-high text-blue-600"></i> NFR-02 & 03: Performance & Uptime
+                            </h4>
+                            <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded">PASSED</span>
+                        </div>
+                        
+                        <div class="space-y-3 text-xs">
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <div>
+                                    <div class="font-semibold text-slate-700">Dashboard & EHR Query Latency</div>
+                                    <div class="text-slate-500">Requirement: &lt; 2.0s under load</div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-lg font-bold text-teal-600 font-mono" id="latency-val">142 ms</span>
+                                    <div class="text-[10px] text-emerald-600 font-medium">Optimal</div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <div>
+                                    <div class="font-semibold text-slate-700">System Operating Uptime</div>
+                                    <div class="text-slate-500">Target: 99.5% Uptime SLA</div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-lg font-bold text-slate-800 font-mono">99.85%</span>
+                                    <div class="text-[10px] text-emerald-600 font-medium">Measured (30d)</div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                                <div class="font-semibold text-slate-700">Automated Backup Integrity</div>
+                                <div class="text-slate-500 flex justify-between">
+                                    <span>Schedule: Daily at 00:00 UTC</span>
+                                    <span class="text-slate-700 font-medium">Last: Today 00:00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ================= MODALS & POPUPS ================= -->
+
+    <!-- MODAL 1: REGISTER NEW PATIENT (UC-01 & FR-04) -->
+    <div id="modal-register-patient" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-6 py-4 bg-teal-800 text-white flex items-center justify-between shrink-0">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Patient Registration (UC-01 Flow)
+                </h3>
+                <button onclick="closeModal('modal-register-patient')" class="text-teal-200 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Form Content -->
+            <form id="form-register-patient" onsubmit="handlePatientRegistration(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                
+                <!-- Simulated Duplicate Detection Alert (Alternative Flow 5a) -->
+                <div id="duplicate-warning" class="bg-amber-50 border border-amber-300 text-amber-800 p-3 rounded-lg text-xs hidden flex items-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm shrink-0 mt-0.5"></i>
+                    <div>
+                        <strong>Alternative Flow 5a (Duplicate Warning):</strong>
+                        <p class="mt-0.5">A patient named "<span id="duplicate-name"></span>" is already registered under Household ID #1042. Please verify to avoid duplicates.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">First Name *</label>
+                        <input type="text" id="reg-fname" required onblur="checkDuplicateTrigger()" placeholder="e.g. Maria Clara" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name *</label>
+                        <input type="text" id="reg-lname" required onblur="checkDuplicateTrigger()" placeholder="e.g. Dela Cruz" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Birthdate *</label>
+                        <input type="date" id="reg-dob" required class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sex *</label>
+                        <select id="reg-sex" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Household ID *</label>
+                        <input type="text" id="reg-household" required placeholder="HH-1048" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Sitio / Street Address *</label>
+                    <input type="text" id="reg-address" required placeholder="Purok 3, Sitio Riverside, Brgy. Poblacion" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number</label>
+                        <input type="text" id="reg-contact" placeholder="0917-123-4567" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Chronic Illness Tag</label>
+                        <select id="reg-chronic" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            <option value="None">None</option>
+                            <option value="Hypertension">Hypertension</option>
+                            <option value="Diabetes">Diabetes Type II</option>
+                            <option value="Asthma">Bronchial Asthma</option>
+                            <option value="Pediatric">Pediatric Monitoring</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-200 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal('modal-register-patient')" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold shadow">Save Patient & Generate EHR</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 2: PATIENT EHR DETAILED VIEW (FR-05, FR-06, FR-07) -->
+    <div id="modal-patient-profile" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            
+            <!-- EHR Top Header -->
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-base" id="ehr-avatar">
+                        JD
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base flex items-center gap-2" id="ehr-name">Juanita Dela Cruz</h3>
+                        <p class="text-xs text-slate-400 font-mono" id="ehr-id-code">ID: BM-2026-0891 | Household #HH-1042</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-patient-profile')" class="text-slate-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- EHR Tabs Bar -->
+            <div class="bg-slate-100 border-b border-slate-200 px-6 flex items-center gap-6 text-xs font-semibold text-slate-600 shrink-0">
+                <button onclick="switchEhrTab('consultations')" id="ehr-tab-btn-consultations" class="py-3 text-teal-700 border-b-2 border-teal-700">Consultation History & Notes</button>
+                <button onclick="switchEhrTab('pediatric')" id="ehr-tab-btn-pediatric" class="py-3 text-slate-500 hover:text-slate-700">Pediatric Vaccines & Growth (FR-06)</button>
+                <button onclick="switchEhrTab('qrcode')" id="ehr-tab-btn-qrcode" class="py-3 text-slate-500 hover:text-slate-700">Digital Health Card / QR Code</button>
+            </div>
+
+            <!-- EHR Scrollable Content -->
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                
+                <!-- TAB CONTENT A: CONSULTATION HISTORY -->
+                <div id="ehr-content-consultations" class="space-y-6">
+                    <!-- Demographics Summary Banner -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+                        <div><span class="text-slate-400">Age/Sex:</span> <strong id="ehr-age-sex" class="text-slate-800">45 / Female</strong></div>
+                        <div><span class="text-slate-400">Address:</span> <strong id="ehr-address" class="text-slate-800">Purok 2, Brgy Poblacion</strong></div>
+                        <div><span class="text-slate-400">Allergies:</span> <strong id="ehr-allergies" class="text-rose-600">Penicillin</strong></div>
+                        <div><span class="text-slate-400">Chronic Track:</span> <strong id="ehr-chronic-tag" class="text-amber-700">Hypertension</strong></div>
+                    </div>
+
+                    <!-- Append New Consultation Form (FR-07) -->
+                    <div class="bg-teal-50/60 border border-teal-200 rounded-xl p-4 space-y-3">
+                        <h4 class="font-bold text-teal-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-pen-to-square"></i> Append New Consultation & Prescription Notes (FR-07)
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <input type="text" id="note-diagnosis" placeholder="Diagnosis (e.g. Essential Hypertension)" class="text-xs p-2 bg-white border border-teal-300 rounded-lg">
+                            <input type="text" id="note-vitals" placeholder="Vitals (BP: 130/85, Weight: 62kg)" class="text-xs p-2 bg-white border border-teal-300 rounded-lg">
+                            <input type="text" id="note-rx" placeholder="Prescribed Meds (e.g. Amlodipine 5mg)" class="text-xs p-2 bg-white border border-teal-300 rounded-lg">
+                        </div>
+                        <div class="flex justify-end">
+                            <button onclick="appendConsultationNote()" class="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold shadow">
+                                Append Consultation to EHR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- History Timeline -->
+                    <div class="space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm">Historical Medical Timeline</h4>
+                        <div class="space-y-3" id="ehr-timeline-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB CONTENT B: PEDIATRIC MODULE (FR-06) -->
+                <div id="ehr-content-pediatric" class="space-y-6 hidden">
+                    <div class="bg-indigo-50/70 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-900 space-y-1">
+                        <h4 class="font-bold flex items-center gap-2"><i class="fa-solid fa-child"></i> WHO-Aligned Pediatric Immunization & Growth Tracking</h4>
+                        <p>Mandatory childhood vaccines schedule aligned with Department of Health (DOH) Expanded Program on Immunization (EPI).</p>
+                    </div>
+
+                    <!-- Vaccines Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div class="p-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900">
+                            <div class="font-bold flex justify-between"><span>BCG Vaccine</span> <i class="fa-solid fa-circle-check text-emerald-600"></i></div>
+                            <div class="text-[11px] mt-1">Administered: At Birth</div>
+                        </div>
+                        <div class="p-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900">
+                            <div class="font-bold flex justify-between"><span>Hepatitis B</span> <i class="fa-solid fa-circle-check text-emerald-600"></i></div>
+                            <div class="text-[11px] mt-1">Administered: At Birth</div>
+                        </div>
+                        <div class="p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900">
+                            <div class="font-bold flex justify-between"><span>Pentavalent (DPT-HepB-Hib)</span> <i class="fa-solid fa-clock text-amber-600"></i></div>
+                            <div class="text-[11px] mt-1">Dose 2 Scheduled: Next Week</div>
+                        </div>
+                    </div>
+
+                    <!-- Growth Curve Simulation Table -->
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <table class="w-full text-xs text-left">
+                            <tr class="bg-slate-100 font-bold border-b border-slate-200">
+                                <th class="p-2.5">Age Milestone</th>
+                                <th class="p-2.5">Weight (kg)</th>
+                                <th class="p-2.5">Height (cm)</th>
+                                <th class="p-2.5">WHO Growth Classification</th>
+                            </tr>
+                            <tr class="border-b border-slate-100">
+                                <td class="p-2.5">At Birth</td>
+                                <td class="p-2.5">3.2 kg</td>
+                                <td class="p-2.5">49 cm</td>
+                                <td class="p-2.5 text-emerald-600 font-semibold">Normal Standard</td>
+                            </tr>
+                            <tr class="border-b border-slate-100">
+                                <td class="p-2.5">6 Months</td>
+                                <td class="p-2.5">7.4 kg</td>
+                                <td class="p-2.5">66 cm</td>
+                                <td class="p-2.5 text-emerald-600 font-semibold">Normal Standard</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB CONTENT C: DIGITAL QR CODE CARD -->
+                <div id="ehr-content-qrcode" class="space-y-4 hidden text-center py-6">
+                    <div class="max-w-xs mx-auto bg-white p-6 rounded-2xl border border-slate-300 shadow-lg space-y-4">
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-widest">BHWCARE Patient Digital Pass</div>
+                        <!-- Canvas QR Generated -->
+                        <div class="flex justify-center">
+                            <canvas id="qrCodeCanvas" width="160" height="160" class="border border-slate-200 rounded-lg p-2 bg-white"></canvas>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-800 text-sm" id="qr-patient-name">Juanita Dela Cruz</div>
+                            <div class="text-xs text-teal-700 font-mono mt-0.5" id="qr-patient-id">BHW-2026-0891</div>
+                        </div>
+                        <button onclick="window.print()" class="w-full py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800">
+                            <i class="fa-solid fa-print"></i> Print Patient ID Card
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MODAL 3: DISPENSE MEDICATION (UC-02 & FR-10) -->
+    <div id="modal-dispense-med" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
+            <div class="px-6 py-4 bg-blue-600 text-white flex items-center justify-between shrink-0">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-prescription-bottle-medical"></i> Dispense Medicine (UC-02 Flow)
+                </h3>
+                <button onclick="closeModal('modal-dispense-med')" class="text-blue-100 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form onsubmit="handleDispenseSubmit(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Select Patient *</label>
+                    <select id="dispense-patient-select" required class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Select Inventory Item (FIFO Priority Auto-Enforced) *</label>
+                    <select id="dispense-item-select" required onchange="updateDispenseStockPreview()" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Live FIFO Priority Box -->
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1">
+                    <div class="font-semibold flex items-center justify-between">
+                        <span>FIFO Batch Allocation:</span>
+                        <span id="fifo-batch-tag" class="font-mono bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">BATCH-AMX-01</span>
+                    </div>
+                    <div class="text-slate-600">Available Stock in Batch: <strong id="fifo-stock-avail" class="text-blue-700">450 caps</strong></div>
+                    <div class="text-slate-500 text-[11px]">Earliest Expiry: <span id="fifo-exp-date">2026-12-15</span></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity to Dispense *</label>
+                    <input type="number" id="dispense-qty" min="1" max="100" value="21" required class="w-full text-xs p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal('modal-dispense-med')" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow">Confirm & Deduct Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- MODAL 4: REPORT PREVIEW GENERATOR (FR-13, FR-14) -->
+    <div id="modal-report-preview" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-file-invoice"></i> Standard Municipal Report Export Preview (FR-13)
+                </h3>
+                <button onclick="closeModal('modal-report-preview')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar font-mono text-xs bg-slate-50 border-b border-slate-200" id="report-modal-content">
+                <!-- Dynamic Report Document rendered by JS -->
+            </div>
+
+            <div class="p-4 bg-white flex justify-between items-center shrink-0">
+                <span class="text-xs text-slate-500">Format: <strong id="report-format-label">PDF (A4 Standard)</strong></span>
+                <button onclick="downloadSimulatedReport()" class="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow">
+                    <i class="fa-solid fa-download"></i> Save & Download File
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // STATE STORE DATA (Pre-filled sample Philippine Barangay Health Center Context)
+        let currentRole = 'BHW'; // Options: BHW, Admin, Official
+        let sessionSeconds = 898; // FR-03 session countdown
+
+        let patientsData = [
+            { id: 'BHW-2026-0891', fname: 'Juanita', lname: 'Dela Cruz', age: 45, sex: 'Female', household: 'HH-1042', address: 'Purok 2, Brgy. Poblacion', chronic: 'Hypertension', allergies: 'Penicillin', lastVisit: '2026-11-02' },
+            { id: 'BHW-2026-0412', fname: 'Mateo', lname: 'Santos', age: 3, sex: 'Male', household: 'HH-1088', address: 'Purok 5, Brgy. Poblacion', chronic: 'Pediatric', allergies: 'None', lastVisit: '2026-10-28' },
+            { id: 'BHW-2026-0922', fname: 'Rodrigo', lname: 'Reyes', age: 58, sex: 'Male', household: 'HH-1011', address: 'Sitio Riverside, Brgy. Poblacion', chronic: 'Diabetes', allergies: 'Sulfa Drugs', lastVisit: '2026-11-04' },
+            { id: 'BHW-2026-0155', fname: 'Elena', lname: 'Bautista', age: 29, sex: 'Female', household: 'HH-1104', address: 'Purok 1, Brgy. Poblacion', chronic: 'None', allergies: 'None', lastVisit: '2026-10-15' }
+        ];
+
+        let inventoryData = [
+            { name: 'Amoxicillin 500mg Cap', category: 'Antibiotic', batch: 'BATCH-AMX-01', expiry: '2026-12-15', stock: 450, unit: 'caps', alert: 'NORMAL' },
+            { name: 'Paracetamol 500mg Tab', category: 'Analgesic', batch: 'BATCH-PCM-09', expiry: '2026-11-20', stock: 85, unit: 'tabs', alert: 'EXPIRING_SOON' }, // < 60 days
+            { name: 'Ferrous Sulfate + Folic Acid', category: 'Supplements', batch: 'BATCH-FS-03', expiry: '2027-04-10', stock: 30, unit: 'tabs', alert: 'LOW_STOCK' },
+            { name: 'Pentavalent Vaccine (DPT-HepB)', category: 'Vaccines', batch: 'BATCH-VAC-88', expiry: '2027-01-30', stock: 120, unit: 'vials', alert: 'NORMAL' }
+        ];
+
+        let auditLogs = [
+            { time: '10:42 AM', details: 'Dispensed 21 caps Amoxicillin to Juanita Dela Cruz (Batch: BATCH-AMX-01)' },
+            { time: '09:15 AM', details: 'Dispensed 10 tabs Paracetamol to Rodrigo Reyes (Batch: BATCH-PCM-09)' }
+        ];
+
+        // INITIALIZATION ON LOAD
+        window.onload = function() {
+            renderPatientTable();
+            renderInventoryTable();
+            renderAuditLogs();
+            drawMorbidityChart();
+            drawNutritionPie();
+            startSessionTimer();
+            populateDispenseDropdowns();
+        };
+
+        // NAVIGATION TAB SWITCHER
+        function switchTab(tabId) {
+            ['dashboard', 'patients', 'inventory', 'nfr'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`nav-${t}`).classList.remove('bg-teal-700', 'text-white');
+                document.getElementById(`nav-${t}`).classList.add('text-slate-400');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).classList.add('bg-teal-700', 'text-white');
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-400');
+
+            const titles = {
+                dashboard: 'Dashboard & Analytics',
+                patients: 'Patient Electronic Health Records (EHR)',
+                inventory: 'Medicine Inventory & FIFO Control',
+                nfr: 'Non-Functional Requirements Monitor'
+            };
+            document.getElementById('page-title').innerText = titles[tabId];
+        }
+
+        // ROLE SWITCHING SIMULATION (RBAC - FR-02)
+        function changeRole(role) {
+            currentRole = role;
+            document.getElementById('user-role-select').value = role;
+            const badge = document.getElementById('role-badge');
+            const banner = document.getElementById('permission-banner');
+            const bannerText = document.getElementById('permission-banner-text');
+
+            if (role === 'BHW') {
+                badge.className = 'bg-teal-100 text-teal-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-teal-200 flex items-center gap-1.5';
+                badge.innerHTML = '<i class="fa-solid fa-user-shield"></i> Role: BHW User';
+                banner.classList.add('hidden');
+                toggleRestrictedButtons(false);
+            } else if (role === 'Admin') {
+                badge.className = 'bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-purple-200 flex items-center gap-1.5';
+                badge.innerHTML = '<i class="fa-solid fa-user-gear"></i> Role: System Administrator';
+                banner.classList.add('hidden');
+                toggleRestrictedButtons(false);
+            } else if (role === 'Official') {
+                badge.className = 'bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1.5';
+                badge.innerHTML = '<i class="fa-solid fa-eye"></i> Role: Barangay Official (View-Only)';
+                banner.classList.remove('hidden');
+                bannerText.innerText = 'Viewing Mode: Barangay Officials have read-only access to dashboards, reports, and summary analytics. Data entry buttons are disabled.';
+                toggleRestrictedButtons(true);
+            }
+        }
+
+        function toggleRestrictedButtons(disabled) {
+            document.querySelectorAll('.btn-restricted').forEach(btn => {
+                if(disabled) {
+                    btn.classList.add('opacity-40', 'pointer-events-none');
+                } else {
+                    btn.classList.remove('opacity-40', 'pointer-events-none');
+                }
+            });
+        }
+
+        // SESSION TIMER (FR-03)
+        function startSessionTimer() {
+            setInterval(() => {
+                if (sessionSeconds > 0) {
+                    sessionSeconds--;
+                    const m = Math.floor(sessionSeconds / 60).toString().padStart(2, '0');
+                    const s = (sessionSeconds % 60).toString().padStart(2, '0');
+                    document.getElementById('session-timer').innerText = `${m}:${s}`;
+                } else {
+                    alert('FR-03 Session Inactivity Timeout: Automatically logging out to protect patient data privacy.');
+                    resetTimer();
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            sessionSeconds = 900;
+            document.getElementById('session-timer').innerText = "15:00";
+        }
+
+        // RENDER PATIENT TABLE (FR-04, FR-05)
+        function renderPatientTable() {
+            const tbody = document.getElementById('patient-table-body');
+            tbody.innerHTML = '';
+
+            patientsData.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-semibold text-teal-700 text-xs">${p.id}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-800">${p.fname} ${p.lname}</td>
+                    <td class="py-3 px-4 text-slate-600">${p.age} yrs / ${p.sex}</td>
+                    <td class="py-3 px-4 text-slate-500 font-mono text-xs">${p.household}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 text-xs rounded-md font-medium ${p.chronic === 'Hypertension' ? 'bg-amber-100 text-amber-800' : p.chronic === 'Diabetes' ? 'bg-rose-100 text-rose-800' : p.chronic === 'Pediatric' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-600'}">
+                            ${p.chronic}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${p.lastVisit}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="openEhrModal('${p.id}')" class="px-3 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-md text-xs font-semibold">
+                            <i class="fa-solid fa-folder-open mr-1"></i> View EHR
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('stat-total-patients').innerText = patientsData.length.toLocaleString();
+        }
+
+        // FILTER PATIENTS
+        function filterPatients() {
+            const query = document.getElementById('patient-search').value.toLowerCase();
+            const cond = document.getElementById('patient-filter-condition').value;
+
+            const filtered = patientsData.filter(p => {
+                const matchQuery = (p.fname + " " + p.lname + " " + p.id + " " + p.household).toLowerCase().includes(query);
+                const matchCond = (cond === 'ALL') || (p.chronic === cond);
+                return matchQuery && matchCond;
+            });
+
+            const tbody = document.getElementById('patient-table-body');
+            tbody.innerHTML = '';
+            filtered.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-semibold text-teal-700 text-xs">${p.id}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-800">${p.fname} ${p.lname}</td>
+                    <td class="py-3 px-4 text-slate-600">${p.age} yrs / ${p.sex}</td>
+                    <td class="py-3 px-4 text-slate-500 font-mono text-xs">${p.household}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 text-xs rounded-md font-medium ${p.chronic === 'Hypertension' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">${p.chronic}</span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${p.lastVisit}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="openEhrModal('${p.id}')" class="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded-md text-xs font-semibold">View EHR</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // PATIENT REGISTRATION & DUPLICATE DETECT (UC-01)
+        function checkDuplicateTrigger() {
+            const fname = document.getElementById('reg-fname').value.trim();
+            const lname = document.getElementById('reg-lname').value.trim();
+            const warn = document.getElementById('duplicate-warning');
+
+            if (fname.toLowerCase() === 'juanita' && lname.toLowerCase() === 'dela cruz') {
+                document.getElementById('duplicate-name').innerText = `${fname} ${lname}`;
+                warn.classList.remove('hidden');
+            } else {
+                warn.classList.add('hidden');
+            }
+        }
+
+        function handlePatientRegistration(e) {
+            e.preventDefault();
+            const fname = document.getElementById('reg-fname').value;
+            const lname = document.getElementById('reg-lname').value;
+            const dob = document.getElementById('reg-dob').value;
+            const sex = document.getElementById('reg-sex').value;
+            const household = document.getElementById('reg-household').value;
+            const address = document.getElementById('reg-address').value;
+            const chronic = document.getElementById('reg-chronic').value;
+
+            // Generate Unique ID with BHW prefix
+            const newId = `BHW-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+            const age = 2026 - new Date(dob).getFullYear() || 30;
+
+            patientsData.unshift({
+                id: newId, fname, lname, age, sex, household, address, chronic, allergies: 'None', lastVisit: '2026-11-06'
+            });
+
+            renderPatientTable();
+            populateDispenseDropdowns();
+            closeModal('modal-register-patient');
+            alert(`UC-01 Success: Patient ${fname} ${lname} registered into BHWCARE with ID ${newId}`);
+        }
+
+        // OPEN & POPULATE EHR MODAL (FR-05)
+        let activeEhrPatientId = null;
+        function openEhrModal(patientId) {
+            activeEhrPatientId = patientId;
+            const patient = patientsData.find(p => p.id === patientId);
+            if(!patient) return;
+
+            document.getElementById('ehr-name').innerText = `${patient.fname} ${patient.lname}`;
+            document.getElementById('ehr-id-code').innerText = `ID: ${patient.id} | Household #${patient.household}`;
+            document.getElementById('ehr-avatar').innerText = `${patient.fname[0]}${patient.lname[0]}`;
+            document.getElementById('ehr-age-sex').innerText = `${patient.age} yrs / ${patient.sex}`;
+            document.getElementById('ehr-address').innerText = patient.address;
+            document.getElementById('ehr-allergies').innerText = patient.allergies;
+            document.getElementById('ehr-chronic-tag').innerText = patient.chronic;
+
+            // Render Timeline Notes
+            const timeline = document.getElementById('ehr-timeline-list');
+            timeline.innerHTML = `
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+                    <div class="flex justify-between font-bold text-slate-700">
+                        <span>Routine Consultation & Maintenance Check</span>
+                        <span class="text-slate-400 font-normal">2026-11-02</span>
+                    </div>
+                    <div class="text-slate-600">Diagnosis: ${patient.chronic !== 'None' ? patient.chronic : 'General Wellness'}</div>
+                    <div class="text-slate-500 italic">Vitals: BP 120/80, HR 72bpm, Weight 64kg</div>
+                </div>
+            `;
+
+            // Draw QR Code
+            drawQRCode(patient.id, patient.fname + ' ' + patient.lname);
+
+            document.getElementById('modal-patient-profile').classList.remove('hidden');
+        }
+
+        function switchEhrTab(tab) {
+            ['consultations', 'pediatric', 'qrcode'].forEach(t => {
+                document.getElementById(`ehr-content-${t}`).classList.add('hidden');
+                document.getElementById(`ehr-tab-btn-${t}`).className = 'py-3 text-slate-500 hover:text-slate-700';
+            });
+            document.getElementById(`ehr-content-${tab}`).classList.remove('hidden');
+            document.getElementById(`ehr-tab-btn-${tab}`).className = 'py-3 text-teal-700 border-b-2 border-teal-700 font-bold';
+        }
+
+        function appendConsultationNote() {
+            const diag = document.getElementById('note-diagnosis').value;
+            const vitals = document.getElementById('note-vitals').value;
+            const rx = document.getElementById('note-rx').value;
+
+            if(!diag) { alert('Please enter a diagnosis note.'); return; }
+
+            const timeline = document.getElementById('ehr-timeline-list');
+            const newNote = document.createElement('div');
+            newNote.className = "p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs space-y-1";
+            newNote.innerHTML = `
+                <div class="flex justify-between font-bold text-teal-900">
+                    <span>${diag}</span>
+                    <span class="text-teal-600 font-normal">Today (2026-11-06)</span>
+                </div>
+                <div class="text-slate-700">Rx: ${rx || 'N/A'}</div>
+                <div class="text-slate-500 italic">Vitals: ${vitals || 'Not Recorded'}</div>
+            `;
+            timeline.prepend(newNote);
+
+            document.getElementById('note-diagnosis').value = '';
+            document.getElementById('note-vitals').value = '';
+            document.getElementById('note-rx').value = '';
+        }
+
+        // RENDER INVENTORY & FIFO MONITOR (FR-08, FR-09)
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+
+            inventoryData.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+
+                let badge = `<span class="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-800 font-semibold">Sufficient</span>`;
+                if(item.alert === 'EXPIRING_SOON') {
+                    badge = `<span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 font-semibold pulse-badge"><i class="fa-solid fa-clock"></i> Expiry &lt; 60 Days</span>`;
+                } else if(item.alert === 'LOW_STOCK') {
+                    badge = `<span class="px-2 py-0.5 text-xs rounded-full bg-rose-100 text-rose-800 font-semibold pulse-badge"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock Warning</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-semibold text-slate-800">${item.name}</div>
+                        <div class="text-xs text-slate-400">${item.category}</div>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-600">${item.batch}</td>
+                    <td class="py-3 px-4 text-xs font-semibold text-slate-700">${item.expiry}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs bg-slate-100 border border-slate-300 text-slate-700 px-2 py-0.5 rounded font-mono">FIFO-1 Priority</span>
+                    </td>
+                    <td class="py-3 px-4 font-bold text-slate-800">${item.stock} ${item.unit}</td>
+                    <td class="py-3 px-4">${badge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // DISPENSE MEDICATION (UC-02 & FR-10)
+        function populateDispenseDropdowns() {
+            const pSelect = document.getElementById('dispense-patient-select');
+            pSelect.innerHTML = patientsData.map(p => `<option value="${p.id}">${p.fname} ${p.lname} (${p.id})</option>`).join('');
+
+            const iSelect = document.getElementById('dispense-item-select');
+            iSelect.innerHTML = inventoryData.map((item, idx) => `<option value="${idx}">${item.name} (${item.batch})</option>`).join('');
+
+            updateDispenseStockPreview();
+        }
+
+        function updateDispenseStockPreview() {
+            const idx = document.getElementById('dispense-item-select').value;
+            const item = inventoryData[idx];
+            if(item) {
+                document.getElementById('fifo-batch-tag').innerText = item.batch;
+                document.getElementById('fifo-stock-avail').innerText = `${item.stock} ${item.unit}`;
+                document.getElementById('fifo-exp-date').innerText = item.expiry;
+            }
+        }
+
+        function handleDispenseSubmit(e) {
+            e.preventDefault();
+            const pId = document.getElementById('dispense-patient-select').value;
+            const itemIdx = document.getElementById('dispense-item-select').value;
+            const qty = parseInt(document.getElementById('dispense-qty').value);
+
+            const patient = patientsData.find(p => p.id === pId);
+            const item = inventoryData[itemIdx];
+
+            if (qty > item.stock) {
+                alert(`UC-02 Exception: Quantity requested (${qty}) exceeds available batch stock (${item.stock}).`);
+                return;
+            }
+
+            // FR-10 Auto Deduct Stock
+            item.stock -= qty;
+            if(item.stock < 50 && item.alert !== 'EXPIRING_SOON') {
+                item.alert = 'LOW_STOCK';
+            }
+
+            // Append Audit Log
+            const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            auditLogs.unshift({
+                time: nowTime,
+                details: `Dispensed ${qty} ${item.unit} ${item.name} to ${patient.fname} ${patient.lname} (Batch: ${item.batch})`
+            });
+
+            renderInventoryTable();
+            renderAuditLogs();
+            closeModal('modal-dispense-med');
+            alert(`UC-02 Success: Dispensed ${qty} units of ${item.name}. Inventory stock updated.`);
+        }
+
+        function renderAuditLogs() {
+            const logContainer = document.getElementById('dispense-audit-logs');
+            logContainer.innerHTML = auditLogs.map(log => `
+                <div class="py-2 flex items-center justify-between">
+                    <span class="text-slate-700">${log.details}</span>
+                    <span class="text-slate-400 font-mono text-[11px] shrink-0 ml-2">${log.time}</span>
+                </div>
+            `).join('');
+        }
+
+        // REPORT GENERATION (FR-13, FR-14)
+        function openReportModal(format) {
+            document.getElementById('report-format-label').innerText = format === 'PDF' ? 'PDF Formal Document' : 'CSV SpreadSheet Raw';
+            const content = document.getElementById('report-modal-content');
+            
+            const today = new Date().toISOString().split('T')[0];
+            content.innerHTML = `
+                <div class="bg-white p-4 rounded border border-slate-200 space-y-3">
+                    <div class="text-center font-bold text-slate-800 border-b border-slate-200 pb-2">
+                        REPUBLIC OF THE PHILIPPINES <br>
+                        CITY HEALTH OFFICE - BRGY. POBLACION HEALTH CENTER <br>
+                        <span class="text-teal-700">BHWCARE: BARANGAY HEALTH RECORD & INVENTORY CONSOLIDATED REPORT</span>
+                    </div>
+                    <div class="flex justify-between text-slate-500 text-[11px]">
+                        <span>Date Generated: ${today}</span>
+                        <span>Prepared By: ${currentRole} User (BHWCARE System)</span>
+                    </div>
+                    <div class="space-y-1">
+                        <strong class="text-slate-700">1. Demographic Summary:</strong>
+                        <div>- Total Registered Residents: ${patientsData.length} active records</div>
+                        <div>- Chronic Illness Cases (Hypertension/Diabetes): 2 cases tracked</div>
+                    </div>
+                    <div class="space-y-1">
+                        <strong class="text-slate-700">2. Medicine Inventory Status:</strong>
+                        ${inventoryData.map(i => `<div>* ${i.name} [${i.batch}]: ${i.stock} ${i.unit} remaining (Exp: ${i.expiry})</div>`).join('')}
+                    </div>
+                    <div class="text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+                        * BHWCARE Module generated output complying with Republic Act No. 10173 (Data Privacy Act of 2012).
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-report-preview').classList.remove('hidden');
+        }
+
+        function downloadSimulatedReport() {
+            closeModal('modal-report-preview');
+            alert('FR-14 Action: Simulated file download started (BHWCARE_Monthly_Health_Report.pdf)');
+        }
+
+        function downloadSimulatedReport() {
+            closeModal('modal-report-preview');
+            alert('FR-14 Action: Simulated file download started (BrgyMed_Monthly_Report.pdf)');
+        }
+
+        // CANVAS GRAPHICS (FR-12 Analytics Visualizations)
+        function drawMorbidityChart() {
+            const canvas = document.getElementById('morbidityChartCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+
+            const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const cases = [42, 58, 35, 70, 88, 62];
+            
+            const padding = 40;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 2;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Grid Lines
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for(let i = 0; i <= 4; i++) {
+                const y = padding + (chartHeight / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+
+            // Draw Trend Line
+            ctx.strokeStyle = '#0f766e';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            cases.forEach((val, idx) => {
+                const x = padding + (chartWidth / (cases.length - 1)) * idx;
+                const y = canvas.height - padding - (val / 100) * chartHeight;
+                if(idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Draw Points and Labels
+            cases.forEach((val, idx) => {
+                const x = padding + (chartWidth / (cases.length - 1)) * idx;
+                const y = canvas.height - padding - (val / 100) * chartHeight;
+
+                ctx.fillStyle = '#0f766e';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(months[idx], x, canvas.height - 15);
+                ctx.fillText(val.toString(), x, y - 10);
+            });
+        }
+
+        function drawNutritionPie() {
+            const canvas = document.getElementById('nutritionPieCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const slices = [
+                { percent: 0.85, color: '#10b981' }, // Normal
+                { percent: 0.11, color: '#f59e0b' }, // Underweight
+                { percent: 0.04, color: '#f43f5e' }  // Severe
+            ];
+
+            let startAngle = 0;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 10;
+
+            slices.forEach(slice => {
+                const sliceAngle = slice.percent * 2 * Math.PI;
+                ctx.fillStyle = slice.color;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fill();
+                startAngle += sliceAngle;
+            });
+        }
+
+        // QR CODE CANVAS GENERATOR SIMULATION
+        function drawQRCode(id, name) {
+            const canvas = document.getElementById('qrCodeCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            
+            // Draw pseudo QR pattern grid
+            ctx.fillStyle = '#0f172a';
+            const size = 160;
+            const modules = 16;
+            const step = size / modules;
+
+            for(let r=0; r<modules; r++) {
+                for(let c=0; c<modules; c++) {
+                    // Positional corners
+                    if((r<4 && c<4) || (r<4 && c>11) || (r>11 && c<4)) {
+                        ctx.fillRect(c*step, r*step, step-1, step-1);
+                    } else if (Math.random() > 0.45) {
+                        ctx.fillRect(c*step, r*step, step-1, step-1);
+                    }
+                }
+            }
+            document.getElementById('qr-patient-name').innerText = name;
+            document.getElementById('qr-patient-id').innerText = id;
+        }
+
+        // MODAL HELPERS
+        function openRegisterPatientModal() { document.getElementById('modal-register-patient').classList.remove('hidden'); }
+        function openDispenseModal() { document.getElementById('modal-dispense-med').classList.remove('hidden'); }
+        function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
+    </script>
+</body>
+</html>
